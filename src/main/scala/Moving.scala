@@ -1,3 +1,8 @@
+
+case class SingleMoveRating(move: XY, rating: Double, rater: String)
+
+case class TotalMoveRating(move: XY, rating: Double)
+
 trait Moving {
   this: Bot =>
 
@@ -6,11 +11,11 @@ trait Moving {
   var maybeMove: Option[(XY, Double)] = None
 
   def computeMove(): Unit = {
-    this.maybeMove = bestDirection(XY.Directions, debug)
+    this.maybeMove = bestDirection(XY.Directions, moveRatings, debug)
   }
 
-  def bestDirection(directions: List[XY], debug: Boolean = false): Option[(XY, Double)] = {
-    val singleMoveRatings = for {
+  def bestDirection(directions: List[XY], moveRatings: Seq[MoveRater],debug: Boolean = false): Option[(XY, Double)] = {
+    val singleMoveRatings: Seq[SingleMoveRating] = for {
       rater <- moveRatings
       xy <- XY.Directions
       if free(xy)
@@ -44,7 +49,7 @@ trait Moving {
     }
   }
 
-  def showImportantRaters(singleMoveRatings: List[SingleMoveRating]): Unit = {
+  def showImportantRaters(singleMoveRatings: Seq[SingleMoveRating]): Unit = {
     val raterDiffs = singleMoveRatings.groupBy(_.rater).map { case (rater, rms) =>
       val diffs =
         for {
@@ -84,7 +89,7 @@ trait Moving {
       case None => XY.Directions
     }
 
-    bestDirection(spawnDirs).foreach { case (dir, _) =>
+    bestDirection(spawnDirs, Bot.SlaveMoveRaters).foreach { case (dir, _) =>
       add(Cmd.spawn(dir, energy))
     }
   }

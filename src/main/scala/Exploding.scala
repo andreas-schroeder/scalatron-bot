@@ -8,7 +8,7 @@ trait Exploding {
 
     (maybeExploding, maybeMove) match {
       case (Some((radius, r1)), Some((move, r2))) =>
-        if (r1 > r2) {
+        if (Bot.ExplodeCertainty * r1 > r2) {
           maybeMove = None
           add(Cmd.explode(radius))
         }
