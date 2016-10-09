@@ -18,7 +18,7 @@ object AvoidDamage extends MoveRater {
   import Rules._
 
   override val name = "D"
-  override val weight: Double = 1.0
+  override val weight: Double = 0.8
 
   override def rate(bot: Bot, candidate: XY) = {
     import bot._
@@ -97,14 +97,35 @@ object Spread extends MoveRater {
 }
 
 object Attack extends MoveRater {
+
   import Rules._
 
   override val name = "A"
-  override val weight: Double = 1.0
+  override val weight: Double = 0.5
+
+  val factor = 1.0 / 4
 
   override def rate(bot: Bot, candidate: XY) = {
     import bot._
 
-    if(master)  0 else bot.energy / 2.0 * rate(view.all(EnemyMaster), candidate)
+
+    val masterBots = factor * energy * rate(view.all(EnemyMaster), candidate, mult = 1.5)
+    val slaveBots = factor * energy * rate(view.all(EnemySlave), candidate, mult = 2)
+
+    masterBots + slaveBots
+  }
+}
+
+object AvoidAnnihilation extends MoveRater {
+
+  import Rules._
+
+  override val name = "A"
+  override val weight: Double = 0.8
+
+  override def rate(bot: Bot, candidate: XY) = {
+    import bot._
+
+    - energy * countAround(bot, candidate, EnemyMaster)
   }
 }

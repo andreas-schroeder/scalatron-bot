@@ -10,9 +10,8 @@ trait Moving {
 
   var maybeMove: Option[(XY, Double)] = None
 
-  def computeMove(): Unit = {
+  def computeMove(): Unit =
     this.maybeMove = bestDirection(XY.Directions, moveRatings, debug)
-  }
 
   def bestDirection(directions: List[XY], moveRatings: Seq[MoveRater],debug: Boolean = false): Option[(XY, Double)] = {
     val singleMoveRatings: Seq[SingleMoveRating] = for {

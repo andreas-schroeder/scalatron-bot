@@ -15,7 +15,7 @@ object Rules {
   val Wall        = 'W'
   val Unknown     = '?'
 
-  val ExplosionEnemies = Set(EnemyMaster, EnemySlave, Snorg)
+  val ExplosionEnemies = Set(EnemyMaster, EnemySlave)
 
   val SlaveBonks  = Set(Wall, Snorg, EnemySlave, Slave, EnemyMaster)
   val MasterBonks = Set(Wall, Snorg, EnemyMaster)

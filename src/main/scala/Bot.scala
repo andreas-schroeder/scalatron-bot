@@ -51,7 +51,8 @@ object Bot {
   val MaxSlaves = 400
 
   val MasterMoveRaters =  List(AvoidDamage, Harvest, AvoidMasters, AvoidCorners)
-  val SlaveMoveRaters = List(AvoidDamage, Harvest, Spread, Attack)
+
+  val SlaveMoveRaters = List(AvoidDamage, Harvest, Spread, Attack, AvoidAnnihilation)
 }
 
 abstract class Bot(paramMap: Map[String, String]) extends Moving with Exploding {
