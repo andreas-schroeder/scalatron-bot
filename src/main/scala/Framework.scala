@@ -53,6 +53,8 @@ case class XY(x: Int, y: Int) {
 
   def signum = XY(x.signum, y.signum)
 
+  def around: Seq[XY] = XY.Directions.map(_ + this)
+
   def negate = XY(-x, -y)
   def negateX = XY(-x, y)
   def negateY = XY(x, -y)
@@ -126,6 +128,8 @@ object XY {
   val Down      = XY( 0,  1)
   val DownRight = XY( 1,  1)
 
+  val Directions = List(Right, RightUp, Up, UpLeft, Left, LeftDown, Down, DownRight)
+
   def fromDirection45(index: Int): XY = index match {
     case Direction45.Right => Right
     case Direction45.RightUp => RightUp
@@ -187,13 +191,32 @@ case class View(cells: String) {
   def relPosFromIndex(index: Int) = relPosFromAbsPos(absPosFromIndex(index))
   def cellAtRelPos(relPos: XY) = cells.charAt(indexFromRelPos(relPos))
 
-  def offsetToNearest(c: Char) = {
+  def all(c: Char): Seq[XY] = {
     val matchingXY = cells.view.zipWithIndex.filter(_._1 == c)
+    matchingXY.map(p => relPosFromIndex(p._2))
+  }
+
+  def all(f: (Char) => Boolean): Seq[XY] = {
+    val matchingXY = cells.view.zipWithIndex.filter(p => f(p._1))
+    matchingXY.map(p => relPosFromIndex(p._2))
+  }
+
+  def offsetToNearest(f: Char => Boolean): Option[XY] = {
+    val matchingXY = cells.view.zipWithIndex.filter(p => f(p._1))
     if( matchingXY.isEmpty )
       None
     else {
       val nearest = matchingXY.map(p => relPosFromIndex(p._2)).minBy(_.length)
       Some(nearest)
+    }
+  }
+
+  def offsetToNearest(c: Char): Option[XY] = {
+    val matchingXY = all(c)
+    if( matchingXY.isEmpty )
+      None
+    else {
+      Some(matchingXY.minBy(_.length))
     }
   }
 }
