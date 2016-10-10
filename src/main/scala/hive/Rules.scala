@@ -1,3 +1,5 @@
+package hive
+
 object Rules {
 
   val Master      = 'M'

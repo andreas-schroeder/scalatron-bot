@@ -1,3 +1,5 @@
+package hive
+
 /** Utility methods for parsing strings containing a single command of the format
   * "Command(key=value,key=value,...)"
   */
@@ -190,6 +192,8 @@ case class View(cells: String) {
   def relPosFromAbsPos(absPos: XY) = absPos - center
   def relPosFromIndex(index: Int) = relPosFromAbsPos(absPosFromIndex(index))
   def cellAtRelPos(relPos: XY) = cells.charAt(indexFromRelPos(relPos))
+
+  def around(relPos: XY) = XY.Directions.map(offset => cellAtRelPos(relPos + offset))
 
   def all(c: Char): Seq[XY] = {
     val matchingXY = cells.view.zipWithIndex.filter(_._1 == c)
