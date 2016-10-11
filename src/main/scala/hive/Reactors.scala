@@ -15,22 +15,25 @@ object ExplodeR extends Reactor {
 
   override def weight: Double = Weights.ExplodeR
 
-  val damageFactor = 0.5
+  val damageFactor = 0.9
+  val energyFactor = 1.1
 
-  override def react(bot: Bot): Seq[React] = {
+  override def react(bot: Bot, moves: Seq[XY]): Seq[React] = {
     import bot._
 
     val certainty = Bot.ExplodeCertainty
-    val explodeNow = bestExplosion(energy, view)
-      .map { case (radius, rating) => React(Cmd.Explode(radius), name, weight * rating * certainty * damageFactor)}
 
-    val moves = possibleMoves(bot)
+    def adjustRating(rating: Double) =
+      weight * (- energyFactor * energy + rating * certainty * damageFactor)
+
+    val explodeNow = bestExplosion(energy, view)
+      .map { case (radius, rating) => React(Cmd.Explode(radius), name, adjustRating(rating)) }
 
     val explodeLater =
       for {
         move <- moves
         explosion <- bestExplosion(energy, view, offset = move)
-        rating = explosion._2
+        rating = - energyFactor * energy + explosion._2
       } yield (move, rating)
 
     val hunt =
@@ -42,7 +45,7 @@ object ExplodeR extends Reactor {
       } yield (move, masterBots + slaveBots)
 
     val moveReacts = (explodeLater ++ hunt)
-      .map { case (move, rating) => React(Cmd.Move(move), name, weight * rating * certainty * damageFactor)}
+      .map { case (move, rating) => React(Cmd.Move(move), name, adjustRating(rating)) }
 
     moveReacts ++ explodeNow
   }
@@ -73,7 +76,7 @@ object ExplodeR extends Reactor {
 
     def damage(target: XY): Double = {
       val distanceFromCenter = target.length
-      damageAtCenter * (1  - (distanceFromCenter / blastRadius))
+      Math.min(400, damageAtCenter * (1  - (distanceFromCenter / blastRadius)))
     }
 
     targets.map(damage).sum
@@ -86,28 +89,34 @@ object SpawnR extends Reactor {
 
   override def weight: Double = Weights.SpawnR
 
-  override def react(bot: Bot): Seq[React] = {
+  override def react(bot: Bot, moves: Seq[XY]): Seq[React] = {
     import bot._
     if (master && energy >= 100 && slaves < Bot.MaxSlaves)
-      doSpawn(Math.min(8, energy / 100), bot)
-    else if (slave && energy >= 200 && slaves < Bot.MaxSlaves)
-      doSpawn(Math.min(8, (energy / 100) - 1), bot)
+      doSpawn(bot, moves)
+    else if (slave && energy >= 175 && slaves < Bot.MaxSlaves)
+      doSpawn(bot, moves)
     else
       Seq.empty
   }
 
-  def doSpawn(maxTimes: Int, bot: Bot): Seq[React] = {
+  val moveFilter: Cmd => Boolean = c => c.isInstanceOf[Cmd.Move]
+
+  def doSpawn(bot: Bot, moves: Seq[XY]): Seq[React] = {
     import bot._
 
-    val dirs = Reactor.all(bot, Bot.SlaveMoveReactors, debug).filter(_.cmd.isInstanceOf[Cmd.Move]).take(maxTimes)
-    if(dirs.isEmpty) {
-      Seq.empty
-    } else {
-      val energy = if(master) 100 else bot.energy / (dirs.length + 1)
-      // TODO spawn in move direction must happen after move command.
+    val possibleDirs = moves.filter(dir => !bot.maybeMove.contains(dir))
+    val maybeDir = Reactor.best(bot, Bot.SlaveReactors, possibleDirs, onlyMoves = true)
 
-      dirs.map { case React(Cmd.Move(dir), _, _) => React(Cmd.Spawn(dir, energy), name, 500) }
-    }
+    maybeDir.map { case React(Cmd.Move(pos), _, _) =>
+      val bots = (bot.energy / 100) + (if (bot.slave && bot.energy % 100 > 75) 1 else 0)
+      val energy = if(master) {
+        if(bot.energy >= 300) 100 * (bots / 3 * 2) else 100
+      } else {
+        if(bot.energy >= 200) 100 * (bots / 2) else 100
+      }
+
+      React(Cmd.Spawn(pos, energy), name, 500)
+    }.to[List]
   }
 }
 
@@ -140,7 +149,7 @@ object DamageAvoidR extends MoveReactor {
 
 object CornerAvoidR extends MoveReactor {
 
-  override val name = "U"
+  override val name = "W"
   override val weight: Double = 1.0
 
   override def ratingFor(bot: Bot, candidate: XY) = {

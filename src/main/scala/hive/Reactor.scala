@@ -2,39 +2,49 @@ package hive
 
 object Reactor {
 
-  def compatibles(bot: Bot, reactors: Seq[Reactor], debug: Boolean = false): Seq[React] = {
-    val allReacts = all(bot, reactors, debug)
-    val winners = allReacts.groupBy(_.cmd.ops).flatMap { case (ops, reacts) =>
-        if(ops == "Move") {
-          select(reacts, bot.heading.map(h => Cmd.Move(h)))
-        } else {
-          select(reacts)
-        }
-    }.to[List]
+  def possibleMoves(bot: Bot) = XY.Directions.filter(bot.free)
 
-    val maybeExplode = winners.find(_.cmd.isInstanceOf[Cmd.Explode])
-    maybeExplode match {
-      case Some(explode) =>
-        if(winners.forall(r => r.rating <= explode.rating))
-          Seq(explode)
-        else
-          winners.filterNot(_ == explode)
-      case None => winners
+  def process(bot: Bot, debug: Boolean = false): Unit = {
+    val moves = possibleMoves(bot).filter(resolveCollision(bot))
+    val allReacts = all(bot, bot.reactors, moves, debug = debug)
+
+    val maybeMove = select(allReacts.filter(_.cmd.isInstanceOf[Cmd.Move]), bot.heading.map(h => Cmd.Move(h)))
+    val maybeExplode = select(allReacts.filter(_.cmd.isInstanceOf[Cmd.Explode]))
+
+    val options = maybeExplode.to[List] ++ maybeMove.to[List]
+
+    if(options.nonEmpty) {
+      val bestOption = (maybeExplode.to[List] ++ maybeMove.to[List]).maxBy(_.rating)
+      bot.add(bestOption.cmd)
+    }
+
+    if(!bot.exploding)
+      SpawnR.react(bot, moves).foreach(r => bot.add(r.cmd))
+  }
+
+  def resolveCollision(bot: Bot)(move: XY): Boolean = {
+    if(bot.collision.contains(move)) {
+      println("collision!")
+      val slavesAroundInOrder = move.around.filter(p => bot.view.cellAtRelPos(p) == Rules.Slave)
+      slavesAroundInOrder.head == move.negate // allow move only if this bot is the first in the list.
+    } else {
+      true
     }
   }
 
-  def all(bot: Bot, reactors: Seq[Reactor], debug: Boolean = false): Seq[React] = {
+  def all(bot: Bot, reactors: Seq[Reactor], moves: Seq[XY], onlyMoves: Boolean = false, debug: Boolean = false): Seq[React] = {
     val reacts =
       for {
         reactor <- reactors
-        react <- reactor.react(bot)
+        react <- reactor.react(bot, moves)
+        if !onlyMoves || react.cmd.isInstanceOf[Cmd.Move]
       } yield react
 
     normalize(sum(reacts))
   }
 
-  def best(bot: Bot, reactors: Seq[Reactor], predicate: Cmd => Boolean = _ => true, debug: Boolean = false): Option[React] = {
-    val allReacts = all(bot, reactors, debug).filter(r => predicate(r.cmd))
+  def best(bot: Bot, reactors: Seq[Reactor], moves: Seq[XY], onlyMoves: Boolean = false, debug: Boolean = false): Option[React] = {
+    val allReacts = all(bot, reactors, moves, onlyMoves, debug)
     select(allReacts)
   }
 
@@ -51,7 +61,10 @@ object Reactor {
       val ratings = reacts.map(_.rating)
       val min = ratings.min
       val range = ratings.max - min
-      reacts.map { case React(cmd, n, r) => React(cmd, n, (r - min) / range) }
+      if (range == 0)
+        reacts
+      else
+        reacts.map { case React(cmd, n, r) => React(cmd, n, (r - min) / range) }
     }
 
   def random[T](s: Seq[T]): Option[T] = if(s.isEmpty) None else Some(s(util.Random.nextInt(s.length)))
@@ -87,9 +100,7 @@ trait Reactor {
 
   def weight: Double
 
-  def react(bot: Bot): Seq[React]
-
-  def possibleMoves(bot: Bot) = XY.Directions.filter(bot.free)
+  def react(bot: Bot, moves: Seq[XY]): Seq[React]
 
   def beastSpeed(bot: Bot): Double = if (bot.master) 0.75 else 0.5
 
@@ -102,9 +113,9 @@ trait Reactor {
 
 trait MoveReactor extends Reactor {
 
-  def react(bot: Bot): Seq[React] = {
+  def react(bot: Bot, moves: Seq[XY]): Seq[React] = {
     for {
-      move <- possibleMoves(bot)
+      move <- moves
       rating = weight * ratingFor(bot, move)
     } yield React(Cmd.Move(move), name, rating)
   }

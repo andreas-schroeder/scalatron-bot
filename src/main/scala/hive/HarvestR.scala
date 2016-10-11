@@ -6,7 +6,7 @@ object HarvestR extends Reactor {
   override val name = "H"
   override val weight: Double = 1.0
 
-  override def react(bot: Bot): Seq[React] = {
+  override def react(bot: Bot, moves: Seq[XY]): Seq[React] = {
     import bot._
 
     val ownSpeed = if(bot.master) 1.0 else 2.0
@@ -23,7 +23,7 @@ object HarvestR extends Reactor {
     val huntableFluppets = view.all(Fluppet).filter(otherCloser)
 
     for {
-      move <- possibleMoves(bot)
+      move <- moves
       zugars   = 100 * rate(huntableZugars, move)
       fluppets = 200 * rate(huntableFluppets, move, mult = 1 + beastSpeed(bot))
       rating = weight * (zugars + fluppets)

@@ -29,19 +29,18 @@ object Bot {
 
   val MoveCertainty = 0.8
 
-  val ExplodeCertainty = 0.8
+  val ExplodeCertainty = 0.6
 
   val MaxSlaves = 400
 
-  val MasterReactors = List(DamageAvoidR, SpawnR, HarvestR, MasterAvoidR, CornerAvoidR)
+  val MasterReactors = List(DamageAvoidR, HarvestR, MasterAvoidR, CornerAvoidR)
 
-  val SlaveMoveReactors = List(DamageAvoidR, HarvestR, SpreadR, ExplodeR, AnnihilationAvoidR)
-
-  val SlaveReactors  = SlaveMoveReactors ++ List(SpawnR)
+  val SlaveReactors = List(DamageAvoidR, HarvestR, SpreadR, CornerAvoidR, ExplodeR, AnnihilationAvoidR)
 
 }
 
 abstract class Bot(paramMap: Map[String, String]) {
+
   import Bot._
 
   val debug = false
@@ -54,31 +53,28 @@ abstract class Bot(paramMap: Map[String, String]) {
   val gen = paramMap("generation").toInt
   val slaves = paramMap("slaves").toInt
   val energy = paramMap("energy").toInt
+  val collision = paramMap.get("collision").map(XY(_))
   val heading = paramMap.get(Bot.Heading).map(XY(_))
 
   var commands = List[Cmd]()
 
-  var maybeMove: Option[(XY, Double)] = None
+  var maybeMove: Option[XY] = None
 
-  def add(c: Cmd) = {
-    commands = c +: commands
+  def exploding: Boolean = commands.exists(_.isInstanceOf[Cmd.Explode])
+
+  def add(c: Cmd) = c match {
+    case Cmd.Move(xy) => maybeMove = Some(xy)
+    case _ => commands = c +: commands
   }
 
   def run(): String = {
-    val reacts = Reactor.compatibles(this, reactors)
-    reacts.foreach { r =>
-      r.cmd match {
-        case Cmd.Move(dir) => maybeMove = Some((dir, 0.0))
-        case c => add(c)
-      }
-    }
-
+    Reactor.process(this)
     execute()
   }
 
   def execute(): String = {
     val moveAndHeading: List[Cmd] = maybeMove.map {
-      case (xy, _) => List(Cmd.Set(Heading, xy), Cmd.Move(xy))
+      xy => List(Cmd.Set(Heading, xy), Cmd.Move(xy))
     }.to[List].flatten
 
     (moveAndHeading ++ commands).mkString("|")
